@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>越谷マップ コメント共有</title>
+  
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    #map {
+      width: 100%;
+      height: 100%;
+      background-color: #1a1a1a;
+    }
+
+    /* パスコード認証画面 */
+    #auth-overlay {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.85);
+      z-index: 9999;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: white;
+    }
+
+    .auth-box {
+      background: #ffffff;
+      color: #333;
+      padding: 24px;
+      border-radius: 12px;
+      text-align: center;
+      width: 80%;
+      max-width: 320px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    }
+
+    .auth-box input {
+      width: 100%;
+      padding: 10px;
+      margin: 12px 0;
+      box-sizing: border-box;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 16px;
+      text-align: center;
+    }
+
+    .auth-box button {
+      width: 100%;
+      padding: 10px;
+      background-color: #06C755; /* LINEグリーン */
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    /* ポップアップ風モーダル（コメント投稿用） */
+    .popup-form {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-width: 200px;
+    }
+
+    .popup-form input, .popup-form textarea {
+      width: 100%;
+      padding: 8px;
+      box-sizing: border-box;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+
+    .popup-form button {
+      padding: 8px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .comment-item {
+      border-bottom: 1px solid #eee;
+      padding: 4px 0;
+    }
+    .comment-user {
+      font-weight: bold;
+      font-size: 12px;
+      color: #555;
+    }
+    .comment-text {
+      font-size: 14px;
+      margin-top: 2px;
+    }
+    .comment-date {
+      font-size: 10px;
+      color: #999;
+      text-align: right;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- パスコード入力画面 -->
+  <div id="auth-overlay">
+    <div class="auth-box">
+      <h3>オープンチャット限定</h3>
+      <p style="font-size: 12px; color: #666;">ノートに記載されている合言葉を入力してください</p>
+      <input type="password" id="passcode-input" placeholder="合言葉を入力">
+      <button onclick="checkPasscode()">入場する</button>
+      <p id="auth-error" style="color: red; font-size: 12px; display: none; margin-top: 8px;">合言葉が違います</p>
+    </div>
+  </div>
+
+  <!-- 地図表示エリア -->
+  <div id="map"></div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+
+  <script>
+    // ==========================================
+    // 1. 設定情報
+    // ==========================================
+    
+    // LINEオープンチャット用の合言葉（好きな文字列に変更してください）
+    const SECRET_PASSCODE = "koshigaya2026";
+
+    // ★ここにご自身のFirebase設定を貼り付けてください
+    const firebaseConfig = {
+    apiKey: "AIzaSyB5crDFLr90xs8MgDPbt4jqZS-tvAHiFlU",
+    authDomain: "koshigaya-map.firebaseapp.com",
+    databaseURL: "https://koshigaya-map-default-rtdb.firebaseio.com",
+    projectId: "koshigaya-map",
+    storageBucket: "koshigaya-map.firebasestorage.app",
+    messagingSenderId: "270056992218",
+    appId: "1:270056992218:web:34097826f0ed6f7d78e4e3",
+    measurementId: "G-S46JHYRHP1"
+  };
+
+    // Firebaseの初期化
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    const markersRef = db.ref('map_markers');
+
+    // ==========================================
+    // 2. パスコード認証処理
+    // ==========================================
+    function checkPasscode() {
+      const input = document.getElementById('passcode-input').value;
+      if (input === SECRET_PASSCODE) {
+        document.getElementById('auth-overlay').style.display = 'none';
+      } else {
+        document.getElementById('auth-error').style.display = 'block';
+      }
+    }
+
+    // ==========================================
+    // 3. Leaflet地図の初期化 (自前PNG画像モード)
+    // ==========================================
+    // 画像サイズ: 横 2400px, 縦 3200px
+    const imgWidth = 2400;
+    const imgHeight = 3200;
+
+    // Y軸（縦）: 0〜3200, X軸（横）: 0〜2400
+    const bounds = [[0, 0], [imgHeight, imgWidth]];
+
+    const map = L.map('map', {
+      crs: L.CRS.Simple, // 平面画像用の座標系
+      minZoom: -2,
+      maxZoom: 2,
+      maxBounds: bounds,
+      maxBoundsViscosity: 0.8
+    });
+
+    // PNG画像の読み込み
+    const image = L.imageOverlay('koshigaya_map.png', bounds).addTo(map);
+
+    // 全体が見えるようにビューを設定
+    map.fitBounds(bounds);
+
+    // ==========================================
+    // 4. マーカーのリアルタイム表示・投稿処理
+    // ==========================================
+
+    // Firebaseからのデータを読み込んで地図上にピンを立てる（他の人の投稿もリアルタイム更新）
+    markersRef.on('child_added', (snapshot) => {
+      const data = snapshot.val();
+      const key = snapshot.key;
+
+      const marker = L.marker([data.y, data.x]).addTo(map);
+
+      // 日付のフォーマット
+      const dateStr = new Date(data.timestamp).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+      // ポップアップ（吹き出し）の内容
+      const popupContent = `
+        <div class="comment-item">
+          <div class="comment-user">${escapeHtml(data.name)}</div>
+          <div class="comment-text">${escapeHtml(data.comment).replace(/\n/g, '<br>')}</div>
+          <div class="comment-date">${dateStr}</div>
+        </div>
+      `;
+      marker.bindPopup(popupContent);
+    });
+
+    // 地図をタップ（クリック）した時にコメントフォームを表示
+    map.on('click', (e) => {
+      const x = Math.round(e.latlng.lng);
+      const y = Math.round(e.latlng.lat);
+
+      // 画像の範囲外をクリックした場合は無視
+      if (x < 0 || x > imgWidth || y < 0 || y > imgHeight) return;
+
+      const formHtml = `
+        <div class="popup-form">
+          <strong style="font-size: 12px; color: #333;">ここにコメントを追加</strong>
+          <input type="text" id="input-name" placeholder="お名前（ニックネーム）">
+          <textarea id="input-comment" rows="3" placeholder="コメントを入力..."></textarea>
+          <button onclick="saveMarker(${x}, ${y})">投稿する</button>
+        </div>
+      `;
+
+      L.popup()
+        .setLatLng(e.latlng)
+        .setContent(formHtml)
+        .openOn(map);
+    });
+
+    // データベースへ保存する関数
+    function saveMarker(x, y) {
+      const name = document.getElementById('input-name').value.trim();
+      const comment = document.getElementById('input-comment').value.trim();
+
+      if (!name || !comment) {
+        alert("名前とコメントの両方を入力してください。");
+        return;
+      }
+
+      // Firebaseに書き込み
+      markersRef.push({
+        x: x,
+        y: y,
+        name: name,
+        comment: comment,
+        timestamp: firebase.database.ServerValue.TIMESTAMP
+      });
+
+      map.closePopup();
+    }
+
+    // XSS対策（エスケープ処理）
+    function escapeHtml(str) {
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+    }
+  </script>
+</body>
+</html>
