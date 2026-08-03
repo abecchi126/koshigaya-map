@@ -11,23 +11,23 @@
     html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     #map { width: 100%; height: 100%; background-color: #1a1a1a; }
 
-    /* パスコード画面 */
+    /* パスコード・ログイン画面 */
     #auth-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.85); z-index: 9999; display: flex; justify-content: center; align-items: center; color: white; }
     .auth-box { background: #fff; color: #333; padding: 24px; border-radius: 12px; text-align: center; width: 80%; max-width: 320px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
-    .auth-box input { width: 100%; padding: 10px; margin: 12px 0; box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; text-align: center; }
-    .auth-box button { width: 100%; padding: 10px; background-color: #06C755; color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; }
+    .auth-box input { width: 100%; padding: 10px; margin: 8px 0; box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; text-align: center; }
+    .auth-box button { width: 100%; padding: 10px; margin-top: 8px; background-color: #06C755; color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; }
 
-    /* ★ポップアップ（吹き出し）のデザインを大型化★ */
+    /* ポップアップ（吹き出し）のデザイン */
     .leaflet-popup-content-wrapper { padding: 4px; border-radius: 8px; }
-    .leaflet-popup-content { margin: 12px; width: 300px !important; } /* 幅を300pxに拡張 */
+    .leaflet-popup-content { margin: 12px; width: 300px !important; }
     
-    .popup-container { width: 100%; max-height: 400px; overflow-y: auto; } /* 高さを400pxに拡大 */
+    .popup-container { width: 100%; max-height: 400px; overflow-y: auto; }
     .comment-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
     .comment-item { background: #f8f9fa; padding: 10px; border-radius: 6px; border-left: 4px solid #007bff; position: relative; }
     .comment-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-    .comment-user { font-weight: bold; font-size: 14px; color: #333; } /* 文字サイズアップ */
+    .comment-user { font-weight: bold; font-size: 14px; color: #333; }
     .comment-date { font-size: 11px; color: #888; }
-    .comment-text { font-size: 14px; color: #333; word-break: break-all; line-height: 1.4; } /* 文字サイズアップ */
+    .comment-text { font-size: 14px; color: #333; word-break: break-all; line-height: 1.4; }
     .delete-btn { font-size: 11px; color: #d9534f; cursor: pointer; border: none; background: none; padding: 2px 4px; margin-left: 6px; font-weight: bold; }
 
     .add-comment-form { display: flex; flex-direction: column; gap: 8px; border-top: 2px solid #eee; padding-top: 10px; }
@@ -37,13 +37,17 @@
 </head>
 <body>
 
+  <!-- ログイン・パスコード認証画面 -->
   <div id="auth-overlay">
     <div class="auth-box">
-      <h3>オープンチャット限定</h3>
-      <p style="font-size: 12px; color: #666;">合言葉を入力してください</p>
-      <input type="password" id="passcode-input" placeholder="合言葉を入力">
+      <h3 style="margin-top:0;">オープンチャット限定</h3>
+      <p style="font-size: 12px; color: #666; margin-bottom: 12px;">お名前と合言葉を入力してください</p>
+      
+      <input type="text" id="username-input" placeholder="お名前（表示名）">
+      <input type="password" id="passcode-input" placeholder="合言葉">
+      
       <button onclick="checkPasscode()">入場する</button>
-      <p id="auth-error" style="color: red; font-size: 12px; display: none; margin-top: 8px;">合言葉が違います</p>
+      <p id="auth-error" style="color: red; font-size: 12px; display: none; margin-top: 8px;"></p>
     </div>
   </div>
 
@@ -57,6 +61,9 @@
     // 1. 設定情報
     const SECRET_PASSCODE = "koshigaya"; // ★合言葉
     const ADMIN_PASSCODE = "admin";     // ★削除用の管理者パスワード
+
+    // ログイン中のユーザー名を保持する変数
+    let currentUser = "";
 
     // ★Firebase設定
     const firebaseConfig = {
@@ -74,13 +81,45 @@
     const db = firebase.database();
     const pinsRef = db.ref('map_pins');
 
-    // 2. パスコード認証
+    // ページ読み込み時に保存済みの認証情報・名前をチェック
+    window.addEventListener('DOMContentLoaded', () => {
+      const savedUser = localStorage.getItem('koshigaya_map_username');
+      const savedAuth = localStorage.getItem('koshigaya_map_auth');
+
+      if (savedUser) {
+        document.getElementById('username-input').value = savedUser;
+      }
+
+      // 過去に認証成功済みなら自動ログイン
+      if (savedAuth === 'true' && savedUser) {
+        currentUser = savedUser;
+        document.getElementById('auth-overlay').style.display = 'none';
+      }
+    });
+
+    // 2. パスコード・名前認証機能
     function checkPasscode() {
-      const input = document.getElementById('passcode-input').value;
-      if (input === SECRET_PASSCODE) {
+      const usernameInput = document.getElementById('username-input').value.trim();
+      const passInput = document.getElementById('passcode-input').value;
+      const errorEl = document.getElementById('auth-error');
+
+      if (!usernameInput) {
+        errorEl.textContent = "お名前を入力してください。";
+        errorEl.style.display = 'block';
+        return;
+      }
+
+      if (passInput === SECRET_PASSCODE) {
+        currentUser = usernameInput;
+        
+        // ブラウザ（LocalStorage）にユーザー情報と認証成功状態を保存
+        localStorage.setItem('koshigaya_map_username', currentUser);
+        localStorage.setItem('koshigaya_map_auth', 'true');
+
         document.getElementById('auth-overlay').style.display = 'none';
       } else {
-        document.getElementById('auth-error').style.display = 'block';
+        errorEl.textContent = "合言葉が違います。";
+        errorEl.style.display = 'block';
       }
     }
 
@@ -103,7 +142,7 @@
     // 4. ピンとスレッドの管理
     const activeMarkers = {}; // pinId -> Leaflet Marker
 
-    // Firebase側でピンが削除されたら、画面上からもピンを即座に削除
+    // Firebase側でピンが削除された場合
     pinsRef.on('child_removed', (snapshot) => {
       const pinId = snapshot.key;
       if (activeMarkers[pinId]) {
@@ -116,7 +155,7 @@
     pinsRef.on('value', (snapshot) => {
       const pinsData = snapshot.val() || {};
 
-      // 1) DBに存在しないピンが画面に残っていれば消去
+      // 1) DBに存在しないピンの消去
       Object.keys(activeMarkers).forEach(pinId => {
         if (!pinsData[pinId]) {
           map.removeLayer(activeMarkers[pinId]);
@@ -128,7 +167,7 @@
       Object.keys(pinsData).forEach(pinId => {
         const pin = pinsData[pinId];
 
-        // コメントが存在しないゴミデータが残っている場合はDBから完全削除
+        // コメントが存在しないゴミデータの自動クリーンアップ
         if (!pin.comments || Object.keys(pin.comments).length === 0) {
           pinsRef.child(pinId).remove();
           if (activeMarkers[pinId]) {
@@ -158,7 +197,7 @@
           <div class="popup-container">
             <div class="comment-list">${commentsHtml}</div>
             <div class="add-comment-form">
-              <input type="text" id="name-${pinId}" placeholder="お名前">
+              <input type="text" id="name-${pinId}" value="${escapeHtml(currentUser)}" placeholder="お名前">
               <textarea id="comment-${pinId}" rows="2" placeholder="追記コメント..."></textarea>
               <button onclick="addCommentToPin('${pinId}')">コメントを追加</button>
             </div>
@@ -184,7 +223,7 @@
       const formHtml = `
         <div class="add-comment-form" style="width:100%;">
           <strong style="font-size:13px; color:#333;">ここに新しいピンを立てる</strong>
-          <input type="text" id="new-name" placeholder="お名前">
+          <input type="text" id="new-name" value="${escapeHtml(currentUser)}" placeholder="お名前">
           <textarea id="new-comment" rows="2" placeholder="コメント..."></textarea>
           <button onclick="createNewPin(${x}, ${y})">ピンを打つ</button>
         </div>
@@ -198,6 +237,12 @@
       const name = document.getElementById('new-name').value.trim();
       const comment = document.getElementById('new-comment').value.trim();
       if (!name || !comment) return alert("名前とコメントを入力してください。");
+
+      // 名前を変更して投稿した場合はローカルストレージも更新
+      if (name !== currentUser) {
+        currentUser = name;
+        localStorage.setItem('koshigaya_map_username', currentUser);
+      }
 
       const newPinRef = pinsRef.push();
       newPinRef.set({
@@ -215,6 +260,12 @@
       const comment = document.getElementById(`comment-${pinId}`).value.trim();
       if (!name || !comment) return alert("名前とコメントを入力してください。");
 
+      // 名前を変更して投稿した場合はローカルストレージも更新
+      if (name !== currentUser) {
+        currentUser = name;
+        localStorage.setItem('koshigaya_map_username', currentUser);
+      }
+
       pinsRef.child(`${pinId}/comments`).push({
         name: name,
         comment: comment,
@@ -222,7 +273,7 @@
       });
     }
 
-    // コメントの削除機能（★確実にピンごと消去するロジック★）
+    // コメントの削除機能（管理者認証）
     function deleteComment(pinId, commentId) {
       const pass = prompt("管理者パスワードを入力してください:");
       if (pass !== ADMIN_PASSCODE) {
@@ -236,14 +287,11 @@
         const comments = snapshot.val() || {};
         const commentKeys = Object.keys(comments);
 
-        // コメントが1件以下（今回消すと0件になる）またはコメントデータ自体がおかしい場合
         if (commentKeys.length <= 1 || !comments[commentId]) {
-          // ピンごとノードを消去
           pinRef.remove().then(() => {
-            map.closePopup(); // 吹き出しを閉じる
+            map.closePopup();
           });
         } else {
-          // 2件以上残っている場合は該当コメントのみ削除
           pinRef.child(`comments/${commentId}`).remove();
         }
       });
