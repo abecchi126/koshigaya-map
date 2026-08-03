@@ -211,9 +211,9 @@
 // コメントの削除機能（管理者パスワード認証 ＆ 最後のコメントならピンごと削除）
   function deleteComment(pinId, commentId) {
     const pass = prompt("管理者パスワードを入力してください:");
-    if   (pass !== ADMIN_PASSCODE) {
-    if   (pass !== null) alert("パスワードが違います。");
-      retu  rn;
+    if (pass !== ADMIN_PASSCODE) {
+    if (pass !== null) alert("パスワードが違います。");
+      return;
   }    
 
     const pinRef = pinsRef.child(pinId);
