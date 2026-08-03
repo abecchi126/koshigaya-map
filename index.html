@@ -208,16 +208,30 @@
       });
     }
 
-    // コメントの削除機能（管理者パスワード認証）
-    function deleteComment(pinId, commentId) {
-      const pass = prompt("管理者パスワードを入力してください:");
-      if (pass === ADMIN_PASSCODE) {
-        pinsRef.child(`${pinId}/comments/${commentId}`).remove();
-      } else if (pass !== null) {
-        alert("パスワードが違います。");
-      }
-    }
+// コメントの削除機能（管理者パスワード認証 ＆ 最後のコメントならピンごと削除）
+  function deleteComment(pinId, commentId) {
+    const pass = prompt("管理者パスワードを入力してください:");
+    if   (pass !== ADMIN_PASSCODE) {
+    if   (pass !== null) alert("パスワードが違います。");
+      retu  rn;
+  }    
 
+    const pinRef = pinsRef.child(pinId);
+    
+    // 対象のピンのコメント一覧を確認
+    pinRef.child('comments').once('value', (snapshot) => {
+      const comments = snapshot.val() || {};
+      const commentKeys = Object.keys(comments);
+
+    // コメントが1件以下（＝今回消すと0件になる）場合はピンごと削除
+    if (commentKeys.length <= 1) {
+      pinRef.remove();
+    } else {
+      // まだ他のコメントが残っている場合は該当コメントのみ削除
+      pinRef.child(`comments/${commentId}`).remove();
+    }
+  });
+}
     function escapeHtml(str) {
       return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
     }
