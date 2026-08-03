@@ -98,18 +98,35 @@
     L.imageOverlay('koshigaya_map.png', bounds).addTo(map);
     map.fitBounds(bounds);
 
-    // 4. ピンとスレッド（複数コメント）の読み込み・保持
+   // 4. ピンとスレッド（複数コメント）の読み込み・保持
     const activeMarkers = {}; // pinId -> Leaflet Marker
 
+    // 【追加】Firebase側でピンが削除されたら、画面上のピンも消すリアルタイム処理
+    pinsRef.on('child_removed', (snapshot) => {
+      const pinId = snapshot.key;
+      if (activeMarkers[pinId]) {
+        map.removeLayer(activeMarkers[pinId]); // 地図上からピンを消去
+        delete activeMarkers[pinId];            // メモリから削除
+      }
+    });
+
+    // データの変更・追加を監視
     pinsRef.on('value', (snapshot) => {
       const pinsData = snapshot.val() || {};
 
-      // 既存のピンを一度更新
+      // Firebaseに存在しないピンが画面に残っていれば消去する（一括削除対策）
+      Object.keys(activeMarkers).forEach(pinId => {
+        if (!pinsData[pinId]) {
+          map.removeLayer(activeMarkers[pinId]);
+          delete activeMarkers[pinId];
+        }
+      });
+
+      // ピンの描画・更新処理
       Object.keys(pinsData).forEach(pinId => {
         const pin = pinsData[pinId];
         const comments = pin.comments ? Object.keys(pin.comments).map(k => ({ id: k, ...pin.comments[k] })) : [];
 
-        // 吹き出しHTMLの生成
         let commentsHtml = comments.map(c => {
           const dateStr = new Date(c.timestamp).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
           return `
@@ -138,14 +155,12 @@
         if (activeMarkers[pinId]) {
           activeMarkers[pinId].getPopup().setContent(popupContent);
         } else {
-          // 新しいピンを作成
           const marker = L.marker([pin.y, pin.x]).addTo(map);
           marker.bindPopup(popupContent);
           activeMarkers[pinId] = marker;
         }
       });
     });
-
     // 5. 新しい場所にピンを打つ（新規投稿）
     map.on('click', (e) => {
       const x = Math.round(e.latlng.lng);
