@@ -17,19 +17,22 @@
     .auth-box input { width: 100%; padding: 10px; margin: 12px 0; box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; text-align: center; }
     .auth-box button { width: 100%; padding: 10px; background-color: #06C755; color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; }
 
-    /* ポップアップ（吹き出し）のデザイン */
-    .popup-container { max-width: 260px; max-height: 300px; overflow-y: auto; }
-    .comment-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
-    .comment-item { background: #f8f9fa; padding: 8px; border-radius: 6px; border-left: 3px solid #007bff; position: relative; }
-    .comment-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
-    .comment-user { font-weight: bold; font-size: 12px; color: #333; }
-    .comment-date { font-size: 10px; color: #888; }
-    .comment-text { font-size: 13px; color: #444; word-break: break-all; }
-    .delete-btn { font-size: 10px; color: #d9534f; cursor: pointer; border: none; background: none; padding: 0; margin-left: 6px; }
+    /* ★ポップアップ（吹き出し）のデザインを大型化★ */
+    .leaflet-popup-content-wrapper { padding: 4px; border-radius: 8px; }
+    .leaflet-popup-content { margin: 12px; width: 300px !important; } /* 幅を300pxに拡張 */
+    
+    .popup-container { width: 100%; max-height: 400px; overflow-y: auto; } /* 高さを400pxに拡大 */
+    .comment-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+    .comment-item { background: #f8f9fa; padding: 10px; border-radius: 6px; border-left: 4px solid #007bff; position: relative; }
+    .comment-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+    .comment-user { font-weight: bold; font-size: 14px; color: #333; } /* 文字サイズアップ */
+    .comment-date { font-size: 11px; color: #888; }
+    .comment-text { font-size: 14px; color: #333; word-break: break-all; line-height: 1.4; } /* 文字サイズアップ */
+    .delete-btn { font-size: 11px; color: #d9534f; cursor: pointer; border: none; background: none; padding: 2px 4px; margin-left: 6px; font-weight: bold; }
 
-    .add-comment-form { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid #eee; padding-top: 8px; }
-    .add-comment-form input, .add-comment-form textarea { width: 100%; padding: 6px; box-sizing: border-box; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; }
-    .add-comment-form button { padding: 6px; background-color: #007bff; color: white; border: none; border-radius: 4px; font-weight: bold; font-size: 12px; cursor: pointer; }
+    .add-comment-form { display: flex; flex-direction: column; gap: 8px; border-top: 2px solid #eee; padding-top: 10px; }
+    .add-comment-form input, .add-comment-form textarea { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px; font-size: 13px; }
+    .add-comment-form button { padding: 8px; background-color: #007bff; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 13px; cursor: pointer; }
   </style>
 </head>
 <body>
@@ -46,7 +49,6 @@
 
   <div id="map"></div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
@@ -56,17 +58,17 @@
     const SECRET_PASSCODE = "koshigaya"; // ★合言葉
     const ADMIN_PASSCODE = "admin";     // ★削除用の管理者パスワード
 
-    // ★Firebase設定（ご自身のものに置き換えてください）
+    // ★Firebase設定
     const firebaseConfig = {
-    apiKey: "AIzaSyB5crDFLr90xs8MgDPbt4jqZS-tvAHiFlU",
-    authDomain: "koshigaya-map.firebaseapp.com",
-    databaseURL: "https://koshigaya-map-default-rtdb.firebaseio.com",
-    projectId: "koshigaya-map",
-    storageBucket: "koshigaya-map.firebasestorage.app",
-    messagingSenderId: "270056992218",
-    appId: "1:270056992218:web:34097826f0ed6f7d78e4e3",
-    measurementId: "G-S46JHYRHP1"
-  };
+      apiKey: "AIzaSyB5crDFLr90xs8MgDPbt4jqZS-tvAHiFlU",
+      authDomain: "koshigaya-map.firebaseapp.com",
+      databaseURL: "https://koshigaya-map-default-rtdb.firebaseio.com",
+      projectId: "koshigaya-map",
+      storageBucket: "koshigaya-map.firebasestorage.app",
+      messagingSenderId: "270056992218",
+      appId: "1:270056992218:web:34097826f0ed6f7d78e4e3",
+      measurementId: "G-S46JHYRHP1"
+    };
 
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
@@ -98,15 +100,15 @@
     L.imageOverlay('koshigaya_map.png', bounds).addTo(map);
     map.fitBounds(bounds);
 
-   // 4. ピンとスレッド（複数コメント）の読み込み・保持
+    // 4. ピンとスレッドの管理
     const activeMarkers = {}; // pinId -> Leaflet Marker
 
-    // 【追加】Firebase側でピンが削除されたら、画面上のピンも消すリアルタイム処理
+    // Firebase側でピンが削除されたら、画面上からもピンを即座に削除
     pinsRef.on('child_removed', (snapshot) => {
       const pinId = snapshot.key;
       if (activeMarkers[pinId]) {
-        map.removeLayer(activeMarkers[pinId]); // 地図上からピンを消去
-        delete activeMarkers[pinId];            // メモリから削除
+        map.removeLayer(activeMarkers[pinId]);
+        delete activeMarkers[pinId];
       }
     });
 
@@ -114,7 +116,7 @@
     pinsRef.on('value', (snapshot) => {
       const pinsData = snapshot.val() || {};
 
-      // Firebaseに存在しないピンが画面に残っていれば消去する（一括削除対策）
+      // 1) DBに存在しないピンが画面に残っていれば消去
       Object.keys(activeMarkers).forEach(pinId => {
         if (!pinsData[pinId]) {
           map.removeLayer(activeMarkers[pinId]);
@@ -122,10 +124,21 @@
         }
       });
 
-      // ピンの描画・更新処理
+      // 2) ピンの描画・更新処理
       Object.keys(pinsData).forEach(pinId => {
         const pin = pinsData[pinId];
-        const comments = pin.comments ? Object.keys(pin.comments).map(k => ({ id: k, ...pin.comments[k] })) : [];
+
+        // コメントが存在しないゴミデータが残っている場合はDBから完全削除
+        if (!pin.comments || Object.keys(pin.comments).length === 0) {
+          pinsRef.child(pinId).remove();
+          if (activeMarkers[pinId]) {
+            map.removeLayer(activeMarkers[pinId]);
+            delete activeMarkers[pinId];
+          }
+          return;
+        }
+
+        const comments = Object.keys(pin.comments).map(k => ({ id: k, ...pin.comments[k] }));
 
         let commentsHtml = comments.map(c => {
           const dateStr = new Date(c.timestamp).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -145,7 +158,7 @@
           <div class="popup-container">
             <div class="comment-list">${commentsHtml}</div>
             <div class="add-comment-form">
-              <input type="text" id="name-${pinId}" placeholder="名前">
+              <input type="text" id="name-${pinId}" placeholder="お名前">
               <textarea id="comment-${pinId}" rows="2" placeholder="追記コメント..."></textarea>
               <button onclick="addCommentToPin('${pinId}')">コメントを追加</button>
             </div>
@@ -156,11 +169,12 @@
           activeMarkers[pinId].getPopup().setContent(popupContent);
         } else {
           const marker = L.marker([pin.y, pin.x]).addTo(map);
-          marker.bindPopup(popupContent);
+          marker.bindPopup(popupContent, { maxWidth: 320 });
           activeMarkers[pinId] = marker;
         }
       });
     });
+
     // 5. 新しい場所にピンを打つ（新規投稿）
     map.on('click', (e) => {
       const x = Math.round(e.latlng.lng);
@@ -168,15 +182,15 @@
       if (x < 0 || x > imgWidth || y < 0 || y > imgHeight) return;
 
       const formHtml = `
-        <div class="add-comment-form" style="min-width:180px;">
-          <strong style="font-size:12px;">ここに新しいピンを立てる</strong>
+        <div class="add-comment-form" style="width:100%;">
+          <strong style="font-size:13px; color:#333;">ここに新しいピンを立てる</strong>
           <input type="text" id="new-name" placeholder="お名前">
           <textarea id="new-comment" rows="2" placeholder="コメント..."></textarea>
           <button onclick="createNewPin(${x}, ${y})">ピンを打つ</button>
         </div>
       `;
 
-      L.popup().setLatLng(e.latlng).setContent(formHtml).openOn(map);
+      L.popup({ maxWidth: 320 }).setLatLng(e.latlng).setContent(formHtml).openOn(map);
     });
 
     // 新規ピン作成
@@ -208,30 +222,33 @@
       });
     }
 
-// コメントの削除機能（管理者パスワード認証 ＆ 最後のコメントならピンごと削除）
-  function deleteComment(pinId, commentId) {
-    const pass = prompt("管理者パスワードを入力してください:");
-    if (pass !== ADMIN_PASSCODE) {
-    if (pass !== null) alert("パスワードが違います。");
-      return;
-  }    
+    // コメントの削除機能（★確実にピンごと消去するロジック★）
+    function deleteComment(pinId, commentId) {
+      const pass = prompt("管理者パスワードを入力してください:");
+      if (pass !== ADMIN_PASSCODE) {
+        if (pass !== null) alert("パスワードが違います。");
+        return;
+      }
 
-    const pinRef = pinsRef.child(pinId);
-    
-    // 対象のピンのコメント一覧を確認
-    pinRef.child('comments').once('value', (snapshot) => {
-      const comments = snapshot.val() || {};
-      const commentKeys = Object.keys(comments);
+      const pinRef = pinsRef.child(pinId);
+      
+      pinRef.child('comments').once('value', (snapshot) => {
+        const comments = snapshot.val() || {};
+        const commentKeys = Object.keys(comments);
 
-    // コメントが1件以下（＝今回消すと0件になる）場合はピンごと削除
-    if (commentKeys.length <= 1) {
-      pinRef.remove();
-    } else {
-      // まだ他のコメントが残っている場合は該当コメントのみ削除
-      pinRef.child(`comments/${commentId}`).remove();
+        // コメントが1件以下（今回消すと0件になる）またはコメントデータ自体がおかしい場合
+        if (commentKeys.length <= 1 || !comments[commentId]) {
+          // ピンごとノードを消去
+          pinRef.remove().then(() => {
+            map.closePopup(); // 吹き出しを閉じる
+          });
+        } else {
+          // 2件以上残っている場合は該当コメントのみ削除
+          pinRef.child(`comments/${commentId}`).remove();
+        }
+      });
     }
-  });
-}
+
     function escapeHtml(str) {
       return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
     }
