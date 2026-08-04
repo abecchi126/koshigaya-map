@@ -11,12 +11,12 @@
     html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     #map { width: 100%; height: 100%; background-color: #1a1a1a; }
 
-    /* ★カーソルのカスタマイズ★ */
+    /* カーソルのカスタマイズ */
     #map, .leaflet-grab, .leaflet-interactive {
-      cursor: default !important; /* 地図上はデフォルトの矢印 */
+      cursor: default !important;
     }
     .leaflet-marker-icon, .delete-btn, button, a {
-      cursor: pointer !important; /* ピンやボタンは指差しマーク */
+      cursor: pointer !important;
     }
 
     /* パスコード・ログイン画面 */
@@ -25,11 +25,12 @@
     .auth-box input { width: 100%; padding: 10px; margin: 8px 0; box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; text-align: center; }
     .auth-box button { width: 100%; padding: 10px; margin-top: 8px; background-color: #06C755; color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; }
 
-    /* ポップアップ（吹き出し）のデザイン */
+    /* ★ポップアップ（吹き出し）のデザイン★ */
     .leaflet-popup-content-wrapper { padding: 4px; border-radius: 8px; }
-    .leaflet-popup-content { margin: 12px; width: 300px !important; }
+    .leaflet-popup-content { margin: 12px; width: 280px !important; }
     
-    .popup-container { width: 100%; max-height: 400px; overflow-y: auto; }
+    /* 画面からはみ出ないよう高さを画面比率に応じて制限 */
+    .popup-container { width: 100%; max-height: 60vh; overflow-y: auto; }
     .comment-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
     .comment-item { background: #f8f9fa; padding: 10px; border-radius: 6px; border-left: 4px solid #007bff; position: relative; }
     .comment-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
@@ -49,9 +50,9 @@
   <div id="auth-overlay">
     <div class="auth-box">
       <h3 style="margin-top:0;">オープンチャット限定</h3>
-      <p style="font-size: 12px; color: #666; margin-bottom: 12px;">お名前と合言葉を入力してください</p>
+      <p style="font-size: 12px; color: #666; margin-bottom: 12px;">名前と合言葉を入力してください</p>
       
-      <input type="text" id="username-input" placeholder="お名前（表示名）">
+      <input type="text" id="username-input" placeholder="名前（表示名）">
       <input type="password" id="passcode-input" placeholder="合言葉">
       
       <button onclick="checkPasscode()">入場する</button>
@@ -68,9 +69,16 @@
   <script>
     // 1. 設定情報
     const SECRET_PASSCODE = "koshigaya"; // ★合言葉
-    const ADMIN_PASSCODE = "admin";     // ★削除用の管理者パスワード
+    const ADMIN_PASSCODE = "adminadmin";     // ★削除用の管理者パスワード
 
     let currentUser = "";
+
+    // ポップアップの共通設定（★画面端からはみ出ないように50px余白を開けて自動移動★）
+    const popupOptions = {
+      maxWidth: 300,
+      autoPan: true,
+      autoPanPadding: [50, 50]
+    };
 
     // ★Firebase設定
     const firebaseConfig = {
@@ -110,7 +118,7 @@
       const errorEl = document.getElementById('auth-error');
 
       if (!usernameInput) {
-        errorEl.textContent = "お名前を入力してください。";
+        errorEl.textContent = "名前を入力してください。";
         errorEl.style.display = 'block';
         return;
       }
@@ -197,7 +205,7 @@
           <div class="popup-container">
             <div class="comment-list">${commentsHtml}</div>
             <div class="add-comment-form">
-              <input type="text" id="name-${pinId}" value="${escapeHtml(currentUser)}" placeholder="お名前">
+              <input type="text" id="name-${pinId}" value="${escapeHtml(currentUser)}" placeholder="名前">
               <textarea id="comment-${pinId}" rows="2" placeholder="追記コメント..."></textarea>
               <button onclick="addCommentToPin('${pinId}')">コメントを追加</button>
             </div>
@@ -208,7 +216,7 @@
           activeMarkers[pinId].getPopup().setContent(popupContent);
         } else {
           const marker = L.marker([pin.y, pin.x]).addTo(map);
-          marker.bindPopup(popupContent, { maxWidth: 320 });
+          marker.bindPopup(popupContent, popupOptions);
           activeMarkers[pinId] = marker;
         }
       });
@@ -229,7 +237,7 @@
         </div>
       `;
 
-      L.popup({ maxWidth: 320 }).setLatLng(e.latlng).setContent(formHtml).openOn(map);
+      L.popup(popupOptions).setLatLng(e.latlng).setContent(formHtml).openOn(map);
     });
 
     // 新規ピン作成
