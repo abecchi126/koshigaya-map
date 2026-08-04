@@ -25,12 +25,12 @@
     .auth-box input { width: 100%; padding: 10px; margin: 8px 0; box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; text-align: center; }
     .auth-box button { width: 100%; padding: 10px; margin-top: 8px; background-color: #06C755; color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; }
 
-    /* ★ポップアップ（吹き出し）のデザイン★ */
+    /* ポップアップ（吹き出し）のデザイン */
     .leaflet-popup-content-wrapper { padding: 4px; border-radius: 8px; }
     .leaflet-popup-content { margin: 12px; width: 280px !important; }
     
     /* 画面からはみ出ないよう高さを画面比率に応じて制限 */
-    .popup-container { width: 100%; max-height: 60vh; overflow-y: auto; }
+    .popup-container { width: 100%; max-height: 50vh; overflow-y: auto; }
     .comment-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
     .comment-item { background: #f8f9fa; padding: 10px; border-radius: 6px; border-left: 4px solid #007bff; position: relative; }
     .comment-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
@@ -52,7 +52,7 @@
       <h3 style="margin-top:0;">オープンチャット限定</h3>
       <p style="font-size: 12px; color: #666; margin-bottom: 12px;">名前と合言葉を入力してください</p>
       
-      <input type="text" id="username-input" placeholder="名前（表示名）">
+      <input type="text" id="username-input" placeholder="お名前（表示名）">
       <input type="password" id="passcode-input" placeholder="合言葉">
       
       <button onclick="checkPasscode()">入場する</button>
@@ -73,14 +73,16 @@
 
     let currentUser = "";
 
-    // ポップアップの共通設定（★画面端からはみ出ないように50px余白を開けて自動移動★）
+    // ★ポップアップの設定（画面上部で押し出されないよう自動移動パラメータを強化）★
     const popupOptions = {
       maxWidth: 300,
       autoPan: true,
-      autoPanPadding: [50, 50]
+      keepInView: true,
+      autoPanPaddingTopLeft: [30, 80],     // 上側に大きめの余白を確保して下にスクロールさせる
+      autoPanPaddingBottomRight: [30, 30]
     };
 
-    // ★Firebase設定
+    // Firebase設定
     const firebaseConfig = {
       apiKey: "AIzaSyB5crDFLr90xs8MgDPbt4jqZS-tvAHiFlU",
       authDomain: "koshigaya-map.firebaseapp.com",
@@ -205,7 +207,7 @@
           <div class="popup-container">
             <div class="comment-list">${commentsHtml}</div>
             <div class="add-comment-form">
-              <input type="text" id="name-${pinId}" value="${escapeHtml(currentUser)}" placeholder="名前">
+              <input type="text" id="name-${pinId}" value="${escapeHtml(currentUser)}" placeholder="お名前">
               <textarea id="comment-${pinId}" rows="2" placeholder="追記コメント..."></textarea>
               <button onclick="addCommentToPin('${pinId}')">コメントを追加</button>
             </div>
