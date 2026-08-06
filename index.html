@@ -15,7 +15,7 @@
     #map, .leaflet-grab, .leaflet-interactive {
       cursor: default !important;
     }
-    .leaflet-marker-icon, .delete-btn, button, a {
+    .leaflet-marker-icon, .delete-btn, .edit-btn, button, a {
       cursor: pointer !important;
     }
 
@@ -36,8 +36,9 @@
     .comment-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
     .comment-user { font-weight: bold; font-size: 14px; color: #333; }
     .comment-date { font-size: 11px; color: #888; }
-    .comment-text { font-size: 14px; color: #333; word-break: break-all; line-height: 1.4; }
-    .delete-btn { font-size: 11px; color: #d9534f; cursor: pointer; border: none; background: none; padding: 2px 4px; margin-left: 6px; font-weight: bold; }
+    .comment-actions { display: flex; gap: 4px; }
+    .edit-btn { font-size: 11px; color: #007bff; cursor: pointer; border: none; background: none; padding: 2px 4px; font-weight: bold; }
+    .delete-btn { font-size: 11px; color: #d9534f; cursor: pointer; border: none; background: none; padding: 2px 4px; font-weight: bold; }
 
     .add-comment-form { display: flex; flex-direction: column; gap: 8px; border-top: 2px solid #eee; padding-top: 10px; }
     .add-comment-form input, .add-comment-form textarea { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px; font-size: 13px; }
@@ -73,12 +74,12 @@
 
     let currentUser = "";
 
-    // ★ポップアップの設定（画面上部で押し出されないよう自動移動パラメータを強化）★
+    // ★ポップアップの設定
     const popupOptions = {
       maxWidth: 300,
       autoPan: true,
       keepInView: true,
-      autoPanPaddingTopLeft: [30, 80],     // 上側に大きめの余白を確保して下にスクロールさせる
+      autoPanPaddingTopLeft: [30, 80],
       autoPanPaddingBottomRight: [30, 30]
     };
 
@@ -196,7 +197,10 @@
               <div class="comment-header">
                 <span class="comment-user">${escapeHtml(c.name)}</span>
                 <span class="comment-date">${dateStr}</span>
-                <button class="delete-btn" onclick="deleteComment('${pinId}', '${c.id}')">削除</button>
+                <div class="comment-actions">
+                  <button class="edit-btn" onclick="editComment('${pinId}', '${c.id}')">編集</button>
+                  <button class="delete-btn" onclick="deleteComment('${pinId}', '${c.id}')">削除</button>
+                </div>
               </div>
               <div class="comment-text">${escapeHtml(c.comment).replace(/\n/g, '<br>')}</div>
             </div>
@@ -278,6 +282,28 @@
         name: name,
         comment: comment,
         timestamp: firebase.database.ServerValue.TIMESTAMP
+      });
+    }
+
+    // コメントの編集機能（新規追加）
+    function editComment(pinId, commentId) {
+      const commentRef = pinsRef.child(`${pinId}/comments/${commentId}`);
+      
+      commentRef.once('value', (snapshot) => {
+        const data = snapshot.val();
+        if (!data) return;
+
+        const newComment = prompt("コメントを修正してください:", data.comment);
+        if (newComment === null) return; // キャンセルされた場合
+        
+        const trimmed = newComment.trim();
+        if (!trimmed) {
+          return alert("コメントを空にすることはできません。");
+        }
+
+        commentRef.update({
+          comment: trimmed
+        });
       });
     }
 
